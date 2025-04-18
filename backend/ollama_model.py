@@ -1,6 +1,6 @@
 """Script to run Meta Llama Vision Free Model via Together AI API"""
 import os
-from together import Together
+import together
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -14,7 +14,8 @@ def get_together_client():
     """Get or create a Together client instance."""
     if not TOGETHER_API_KEY:
         raise ValueError("TOGETHER_API_KEY environment variable is not set")
-    return Together(api_key=TOGETHER_API_KEY)
+    together.api_key = TOGETHER_API_KEY
+    return together
 
 
 def generate_response(query, context):
@@ -26,10 +27,15 @@ def generate_response(query, context):
 
     try:
         client = get_together_client()
-        response = client.chat.completions.create(
-            model="meta-llama/Llama-Vision-Free",
-            messages=[{"role": "user", "content": prompt}]
+        response = client.Complete.create(
+            prompt=prompt,
+            model="meta-llama/Llama-2-70b-chat-hf",
+            max_tokens=512,
+            temperature=0.7,
+            top_p=0.7,
+            top_k=50,
+            repetition_penalty=1.1
         )
-        return response.choices[0].message.content
+        return response['output']['choices'][0]['text']
     except Exception as e:
         return f"Error: {e}"
