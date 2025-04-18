@@ -11,9 +11,6 @@ venv/
 *.log
 logs/
 
-# Ignore Render deployment config
-render.yaml
-
 # Ignore IDE-specific files
 .vscode/
 
