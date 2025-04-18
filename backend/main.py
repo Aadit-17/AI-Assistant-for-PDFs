@@ -3,9 +3,10 @@ import io
 import os
 import threading
 import time
+import traceback
 from uuid import uuid4
 import psycopg2
-from fastapi import FastAPI, File, UploadFile, Depends
+from fastapi import FastAPI, File, UploadFile, Depends, HTTPException
 from utils import store_text_in_postgres, query_postgres
 from ollama_model import generate_response
 from pdf_processor import extract_text_from_pdf
@@ -27,9 +28,14 @@ DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 
 
 def get_db_connection():
-    return psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-    )
+    try:
+        return psycopg2.connect(
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
+        )
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Database connection error: {str(e)}")
 
 
 # Track user sessions & auto-delete timers
@@ -51,13 +57,17 @@ def delete_session_data(session_id):
     """Delete session data from PostgreSQL."""
     if session_id in session_store:
         doc_ids = session_store.pop(session_id, [])
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM documents WHERE id = ANY(%s)", (doc_ids,))
-        conn.commit()
-        cur.close()
-        conn.close()
-        print(f"Session {session_id} data deleted due to timeout.")
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "DELETE FROM book_embeddings WHERE id = ANY(%s)", (doc_ids,))
+            conn.commit()
+            cur.close()
+            conn.close()
+            print(f"Session {session_id} data deleted due to timeout.")
+        except Exception as e:
+            print(f"Error deleting session data: {e}")
 
 
 @app.get("/test")
@@ -69,25 +79,31 @@ async def test_endpoint(input_string: str):
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...), session_id: str = Depends(get_session_id)):
     """Upload & process a book without storing it on disk."""
-    pdf_bytes = await file.read()
-    pdf_stream = io.BytesIO(pdf_bytes)
+    try:
+        pdf_bytes = await file.read()
+        pdf_stream = io.BytesIO(pdf_bytes)
 
-    # Extract text & store in PostgreSQL
-    text_chunks = extract_text_from_pdf(pdf_stream)
-    doc_ids = store_text_in_postgres(text_chunks)
+        # Extract text & store in PostgreSQL
+        text_chunks = extract_text_from_pdf(pdf_stream)
+        doc_ids = store_text_in_postgres(text_chunks)
 
-    # Track session data
-    session_store[session_id].extend(doc_ids)
+        # Track session data
+        session_store[session_id].extend(doc_ids)
 
-    # Auto-delete after timeout
-    if session_id in session_timers:
-        session_timers[session_id].cancel()
-    session_timers[session_id] = threading.Timer(
-        SESSION_TIMEOUT, delete_session_data, [session_id]
-    )
-    session_timers[session_id].start()
+        # Auto-delete after timeout
+        if session_id in session_timers:
+            session_timers[session_id].cancel()
+        session_timers[session_id] = threading.Timer(
+            SESSION_TIMEOUT, delete_session_data, [session_id]
+        )
+        session_timers[session_id].start()
 
-    return {"message": "Book uploaded and processed.", "session_id": session_id}
+        return {"message": "Book uploaded and processed.", "session_id": session_id}
+    except Exception as e:
+        print(f"Error processing book: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=500, detail=f"Error processing book: {str(e)}")
 
 
 @app.get("/query/")
@@ -96,36 +112,47 @@ async def query_text(query: str, session_id: str):
     if session_id not in session_store:
         return {"error": "Invalid session ID or expired session."}
 
-    results = query_postgres(query)
-    response = generate_response(query, results)
-
-    return {"query": query, "answer": response, "references": results}
+    try:
+        results = query_postgres(query)
+        response = generate_response(query, results)
+        return {"query": query, "answer": response, "references": results}
+    except Exception as e:
+        print(f"Error querying text: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=500, detail=f"Error querying text: {str(e)}")
 
 
 @app.post("/end_session/")
 async def end_session(session_id: str):
     """Manually clear session data from PostgreSQL."""
     if session_id in session_store:
-        delete_session_data(session_id)
-        if session_id in session_timers:
-            session_timers[session_id].cancel()
-            del session_timers[session_id]
-
-        return {"message": "Session data cleared successfully."}
-
+        try:
+            delete_session_data(session_id)
+            if session_id in session_timers:
+                session_timers[session_id].cancel()
+                del session_timers[session_id]
+            return {"message": "Session data cleared successfully."}
+        except Exception as e:
+            print(f"Error ending session: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Error ending session: {str(e)}")
     return {"message": "Session ID not found or already deleted."}
 
 
 def clear_entire_postgres():
     """Function to clear all stored data from PostgreSQL every 24 hours."""
     print("Starting PostgreSQL cleanup...")
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM documents")
-    conn.commit()
-    cur.close()
-    conn.close()
-    print("Cleanup completed.")
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM book_embeddings")
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("Cleanup completed.")
+    except Exception as e:
+        print(f"Error during cleanup: {e}")
 
 
 def start_daily_cleanup():
