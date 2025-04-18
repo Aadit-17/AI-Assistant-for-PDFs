@@ -7,7 +7,7 @@ st.set_page_config(
     page_title="Conversational Learning Assistant", layout="wide")
 
 # Use environment variable with fallback
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+API_BASE_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 # Session state to store session ID
 if "session_id" not in st.session_state:
