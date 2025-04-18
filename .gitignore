@@ -1,0 +1,21 @@
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore virtual environments
+venv/
+.env
+*.env
+
+# Ignore logs and temp files
+*.log
+logs/
+
+# Ignore Render deployment config
+render.yaml
+
+# Ignore IDE-specific files
+.vscode/
+
+# Ignore Streamlit cache
+.streamlit/
