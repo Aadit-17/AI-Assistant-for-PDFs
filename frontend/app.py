@@ -48,7 +48,7 @@ if uploaded_file is not None and st.session_state.session_id is None:
             st.session_state.session_id = response.json()["session_id"]
             st.success("Book uploaded successfully! You can now ask questions.")
         else:
-            st.error("Error processing the book.")
+            st.error(f"Upload failed: {response.text}")
 
 # Chat interface
 if st.session_state.session_id:
