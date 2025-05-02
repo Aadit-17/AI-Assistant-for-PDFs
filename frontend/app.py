@@ -38,7 +38,9 @@ st.write("Upload a textbook and ask questions about its content.")
 uploaded_file = st.file_uploader("Upload a PDF book", type=["pdf"])
 if uploaded_file is not None and st.session_state.session_id is None:
     with st.spinner("Processing book..."):
-        files = {"file": uploaded_file.getvalue()}
+        files = {
+            "file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)
+        }
         response = requests.post(f"{API_BASE_URL}/upload/",
                                  files=files, timeout=10000)
 
