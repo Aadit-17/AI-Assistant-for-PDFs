@@ -73,7 +73,7 @@ def store_text_in_postgres(text_chunks):
         cursor = conn.cursor()
         doc_ids = []
         for chunk in text_chunks:
-            doc_id = uuid4()
+            doc_id = str(uuid4())  # Convert UUID to string
             embedding = basic_embedding(chunk)
             cursor.execute(
                 "INSERT INTO book_embeddings (id, text, embedding) VALUES (%s, %s, %s)",
