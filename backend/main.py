@@ -115,7 +115,7 @@ async def query_text(query: str, session_id: str):
     try:
         results = query_postgres(query)
         response = generate_response(query, results)
-        return {"query": query, "answer": response, "references": results}
+        return {"query": query, "answer": response}
     except Exception as e:
         print(f"Error querying text: {e}")
         print(traceback.format_exc())

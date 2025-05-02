@@ -66,10 +66,6 @@ if st.session_state.session_id:
                     result = response.json()
                     st.write("**Answer:**", result["answer"])
 
-                    if result["references"]:
-                        with st.expander("📖 References from the book"):
-                            for ref in result["references"]:
-                                st.write(ref)
                 else:
                     st.error("Error retrieving response.")
 
